@@ -1,10 +1,19 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include <Arduino.h>
+#include <string.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#include <EEPROM.h>
+#include <ArduinoJson.h>
+WiFiClient client;
 
 // SSID e Password para o modo AP
 const char *ssid = "SWS_Module";
 const char *password = "12345678";
+const char *ssid_new;
+const char *pass_new;
 
 ESP8266WebServer server(80);
 
@@ -20,10 +29,10 @@ const char MAIN_page[] PROGMEM = R"=====(
  
 <form action="/action_page">
   SSID:<br>
-  <input type="text" name="SSID" value="Flavio">
+  <input type="text" name="SSID" value="">
   <br>
   Password:<br>
-  <input type="text" name="Password" value="Bergamini">
+  <input type="text" name="Password" value="">
   <br><br>
   <input type="submit" value="Submit">
 </form> 
@@ -31,6 +40,18 @@ const char MAIN_page[] PROGMEM = R"=====(
 </body>
 </html>
 )=====";
+
+void logica()
+{
+  Serial.print("Desenvolver a logica final aqui");
+  while(1)
+  {
+    digitalWrite(D3, HIGH);
+    delay(200);
+    digitalWrite(D3, LOW);
+    delay(200);
+  }
+}
 
 void handleRoot() {
  String s = MAIN_page;                                           //lendo HTML
@@ -41,19 +62,90 @@ void handleForm() {
  String ssid_Station = server.arg("SSID"); 
  String pass_Station = server.arg("Password"); 
  
+ ssid_new = ssid_Station.c_str();
+ pass_new = pass_Station.c_str();
+ 
  Serial.print("SSID: ");
  Serial.println(ssid_Station);
  
  Serial.print("Password: ");
  Serial.println(pass_Station);
+ Serial.print("------------- \n");
+ Serial.println(ssid_new);
  
  String s = "<a href='/'> Go Back </a>";
  server.send(200, "text/html", s); //Send web page
+//-----------------------------------------------------------------------
+ for (uint8_t t = 4; t > 0; t--) {
+    Serial.printf("[SETUP] WAIT %d...\n", t);
+    Serial.flush();
+    delay(800);
+  }
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid_new, pass_new);
+  delay(500);
+  int loop1 = 1;
+  if ((WiFi.status() == WL_CONNECTED)) 
+  {
+    while(loop1)
+    {
+      if ((WiFi.status() == WL_CONNECTED)) 
+      {
+        digitalWrite(D0, HIGH);
+        digitalWrite(D1, LOW);
+        loop1 = 0;
+      }
+    }
+    Serial.print("Conectado \n");
+    WriteEEPROM(ssid_new, pass_new);
+    logica();
+  }
+  else{
+    Serial.print("Não conectado \n");
+    digitalWrite(D0, LOW);
+    digitalWrite(D1, HIGH);
+    ESP.reset();
+    modeAP();
+  }
+  
+  
+//-----------------------------------------------------------------------
 }
 
 void setup() {
-  delay(1000);
   Serial.begin(115200);
+  EEPROM.begin(1024);
+  pinMode(D0, OUTPUT);
+  pinMode(D1, OUTPUT);
+  pinMode(D3, OUTPUT);
+  pinMode(D7, INPUT);
+  digitalWrite(D0,LOW);
+  digitalWrite(D1,HIGH);
+  digitalWrite(D3,LOW);
+  byte value = EEPROM.read(0);
+  EEPROM.end();
+  if(digitalRead(D7) == LOW)
+    eraseEEPROM();
+  if(value == 0)
+  {
+    Serial.print("Value = 0");
+    delay(500);
+    modeAP();
+   }
+   else
+   {
+   ReadEEPROM(ssid, password);
+   handleForm(); 
+   }
+}
+
+void loop() {
+  server.handleClient();
+}
+
+void modeAP()
+{
+  delay(1000);
   Serial.println();
   Serial.print("Configuring access point...");
   /* You can remove the password parameter if you want the AP to be open. */
@@ -69,6 +161,69 @@ void setup() {
   Serial.println("HTTP server started");
 }
 
-void loop() {
-  server.handleClient();
+void eraseEEPROM() {
+  EEPROM.begin(1024);
+  for (int i = 0; i < 1024; i++) {
+    EEPROM.write(i, 0);
+  }
+  EEPROM.end();
+}
+
+void WriteEEPROM(String ssid, String password)
+{
+  EEPROM.begin(1024);
+  int ssidlen = ssid.length();
+  int passlen = password.length();
+ 
+  Serial.println("writing eeprom ssid:");
+          for (int i = 0; i < ssidlen; ++i)
+            {
+              EEPROM.write(i, ssid[i]);
+              Serial.print("Wrote: ");
+              Serial.println(ssid[i]); 
+            }
+
+  Serial.println("writing eeprom password:");
+          for (int i = 0; i < passlen; ++i)
+            {
+              EEPROM.write((i+ssidlen), password[i]);
+              Serial.print("Wrote: ");
+              Serial.println(password[i]); 
+            }
+  EEPROM.end();
+}
+
+void ReadEEPROM(String ssid, String password)
+{
+  EEPROM.begin(1024);
+  int ssidlen = ssid.length();
+  int passlen = password.length();
+
+  Serial.println("Reading EEPROM ssid");
+  String esid;
+  for (int i = 0; i < ssidlen; ++i)
+    {
+      esid += char(EEPROM.read(i));
+    }
+    //esid.trim();
+  Serial.println(esid.length());
+  Serial.print("SSID saida: ");
+  Serial.println(esid);
+  
+  Serial.println("\n");
+  
+  Serial.println("Lendo password EEPROM");
+  String passq;
+  for (int i = (ssidlen); i < (ssidlen+passlen); ++i)
+  {
+    passq +=char(EEPROM.read(i));
+  }
+  Serial.println("Tamanho da password: ");
+  Serial.println(passq.length());
+  Serial.println("Password saida: ");
+  Serial.println(passq);
+  
+  ssid_new = esid.c_str();
+  pass_new = passq.c_str();
+  EEPROM.end();
 }
