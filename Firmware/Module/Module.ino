@@ -7,14 +7,16 @@
 #include <WiFiClient.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
-WiFiClient client;
+
 
 // SSID e Password para o modo AP
 const char *ssid = "SWS_Module";
 const char *password = "12345678";
 const char *ssid_new;
 const char *pass_new;
+String serverAddress_http = "http://10.0.0.104";
 
+WiFiClient client;
 ESP8266WebServer server(80);
 
 //IP address padrão para o acesso no navegador http://192.168.4.1
@@ -43,6 +45,10 @@ const char MAIN_page[] PROGMEM = R"=====(
 
 void logica()
 {
+  post("Humidade", 31.22);
+  delay(200);
+  String  pay = gett();
+  Serial.println(pay);
   Serial.print("Desenvolver a logica final aqui");
   while(1)
   {
@@ -51,6 +57,39 @@ void logica()
     digitalWrite(D3, LOW);
     delay(200);
   }
+}
+
+void post(String nome, float valor)
+{
+  String Svalor = String(valor);
+  HTTPClient http;
+  http.begin(serverAddress_http); 
+  http.addHeader("Content-Type", "text/plain");
+  int httpCode = http.POST(nome);
+  String payload = http.getString();
+  http.end();
+  delay(200);
+  http.begin(serverAddress_http);
+  http.addHeader("Content-Type", "text/plain");
+  int httpCode1 = http.POST(Svalor);
+  String payload1 = http.getString();  
+  http.end();
+}
+
+String gett()
+{
+  String pay;
+  HTTPClient http;
+  http.begin(serverAddress_http);
+  int httpReceive = http.GET();
+  //Serial.println(httpReceive);
+  if (httpReceive == HTTP_CODE_OK) 
+  {
+    pay = http.getString();
+   // Serial.println(pay);
+  }
+  http.end();
+  return pay;
 }
 
 void handleRoot() {
