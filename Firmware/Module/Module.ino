@@ -8,13 +8,12 @@
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 
-
 // SSID e Password para o modo AP
 const char *ssid = "SWS_Module";
 const char *password = "12345678";
 const char *ssid_new;
 const char *pass_new;
-String serverAddress_http = "http://10.0.0.104";
+String serverAddress_http = "http://10.0.0.103";
 
 WiFiClient client;
 ESP8266WebServer server(80);
@@ -45,31 +44,36 @@ const char MAIN_page[] PROGMEM = R"=====(
 
 void logica()
 {
-  post("Humidade", 31.22);
-  delay(200);
+  float read1, aux1,read2, aux2;
+
   String  pay = gett();
   Serial.println(pay);
   Serial.print("Desenvolver a logica final aqui");
   while(1)
   {
-    digitalWrite(D3, HIGH);
+    digitalWrite(D4, LOW);
+    digitalWrite(D5, HIGH);
+    read1 = analogRead(A0);
+    aux1 = (read1*100/1023); 
+    post(1);  //seta valor da umidade para ser escrito no firebase
+    post(aux1); //valor da umidade para ser escrito no firebase
+    Serial.println(aux1);
     delay(200);
-    digitalWrite(D3, LOW);
+    digitalWrite(D5, LOW);
+    digitalWrite(D4, HIGH);
+    read2 = analogRead(A0);
+    aux2 = (read2*100/1023); 
+    post(2);  //seta valor da acidez para ser escrito no firebase
+    post(aux2); //valor da acidez para ser escrito no firebase
     delay(200);
   }
 }
 
-void post(String nome, float valor)
+void post(float valor)
 {
   String Svalor = String(valor);
   HTTPClient http;
   http.begin(serverAddress_http); 
-  http.addHeader("Content-Type", "text/plain");
-  int httpCode = http.POST(nome);
-  String payload = http.getString();
-  http.end();
-  delay(200);
-  http.begin(serverAddress_http);
   http.addHeader("Content-Type", "text/plain");
   int httpCode1 = http.POST(Svalor);
   String payload1 = http.getString();  
@@ -158,6 +162,9 @@ void setup() {
   pinMode(D1, OUTPUT);
   pinMode(D3, OUTPUT);
   pinMode(D7, INPUT);
+  pinMode(A0, INPUT);
+  pinMode(D4, OUTPUT);
+  pinMode(D5, OUTPUT);
   digitalWrite(D0,LOW);
   digitalWrite(D1,HIGH);
   digitalWrite(D3,LOW);
